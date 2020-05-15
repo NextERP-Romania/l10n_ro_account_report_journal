@@ -29,6 +29,7 @@
                         name="print_report_html"
                         string="Print HTML"
                         type="object"
+                        
                         class="oe_highlight"
                     />
                     <button
@@ -53,10 +54,11 @@
     <menuitem
         id="menu_anaf_SP_jorunal"
         action="action_anaf_SP_jorunal"
-        parent=	"account.account_reports_management_menu"
+        parent=	"l10n_ro.account_reports_ro_statements_menu"
         sequence="98"
     />
 
-<!--         "l10n_ro.account_reports_ro_statements_menu"
+<!--         
+"account.account_reports_management_menu"
 parent="l10n_ro.account_reports_ro_statements_menu" -->
 </odoo>

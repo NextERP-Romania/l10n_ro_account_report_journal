@@ -126,21 +126,21 @@ class SaleJournalReport(models.TransientModel):
                             f"a value of  {line.credit-line.debit}"
                         )
                 else:
-                    if not line.tag_ids:
+                    if not line.tax_tag_ids:
                         vals['no_tag_like_vat0'] += sign*(line.credit - line.debit)
-                    elif len(line.tag_ids) > 1: 
+                    elif len(line.tax_tag_ids) > 1: 
                         vals["warnings"] += (
                             f"line id={line.id} name={line.name}  does not "
-                            f"have line_tag_ids or have more and I'm not "
+                            f"have line_tax_tag_ids or have more and I'm not "
                             f"going to guess it ( maybe in future); "
                         )
-                    elif line.tag_ids[0].name not in posible_tags_just_names:
+                    elif line.tax_tag_ids[0].name not in posible_tags_just_names:
                         vals["warnings"] += (
-                            f"this tag_ids={line.tag_ids[0].name} is not in "
+                            f"this tax_tag_ids={line.tax_tag_ids[0].name} is not in "
                             f"find_all_account_tax_report_line"
                         )
                     else:
-                        vals[line.tag_ids[0].name] += sign*(line.credit - line.debit)
+                        vals[line.tax_tag_ids[0].name] += sign*(line.credit - line.debit)
                     if line.account_id.code.startswith("419"):
                         vals['avans_clienti'] = (line.credit - line.debit) #!!!!!!!!!!!!!!! we put it only here or also at sum of bases 
             # put the aggregated values
