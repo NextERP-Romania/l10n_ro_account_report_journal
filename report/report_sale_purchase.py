@@ -168,7 +168,7 @@ class SaleJournalReport(models.TransientModel):
                 int_float_keys.append(key)
         totals = {}
         for key in int_float_keys:
-            totals[key] = sum([x[key] for x in report_lines])
+            totals[key] = round(sum([x[key] for x in report_lines]),2)
         return report_lines, totals
 #line.tax_exigible=False   means  tax.tax_exigibility == 'on_payment'
 """
