@@ -20,9 +20,9 @@ class SaleJournalReport(models.TransientModel):
             ("company_id", "=", company_id[0]),
         ]
         if journal_type == "sale":
-            domain += [("type", "in", ["out_invoice", "out_refund", "out_receipt"])]
+            domain += [("move_type", "in", ["out_invoice", "out_refund", "out_receipt"])]
         elif journal_type == "purchase":
-            domain += [("type", "in", ["in_invoice", "in_refund", "in_receipt"])]
+            domain += [("move_type", "in", ["in_invoice", "in_refund", "in_receipt"])]
         return domain
 
     @api.model
