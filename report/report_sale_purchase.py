@@ -4,6 +4,9 @@
 from odoo import api, fields, models
 from copy import deepcopy
 from odoo.exceptions import ValidationError
+import logging
+_logger = logging.getLogger(__name__)
+
 
 class SaleJournalReport(models.TransientModel):
     _name = "report.l10n_ro_account_report_journal.report_sale_purchase"
@@ -70,17 +73,21 @@ class SaleJournalReport(models.TransientModel):
         if not invoices:
             return [],{}
         
-        sale_and_purchase_comun_columns = { 'base_neex':{'type':'int','tags':[]},
-                                           'base_exig':{'type':'int','tags':[]},
-                                           'base_ded1':{'type':'int','tags':[]},
-                                           'base_ded2':{'type':'int','tags':[]},
+        sale_and_purchase_comun_columns = { 'base_neex':{'type':'int','tags':[]}, # vat on payment
+                                           'tva_neex':{'type':'int','tags':[]}, 
+
+                                           'tva_exig':{'type':'int','tags':[]},  # what was payed   =sum of base                  
+                                           'base_exig':{'type':'int','tags':[]},  # vat on payment =sum of vat
+                                           # payment must have number,date,amount(value), base, vat
+
+                                           
+                                           'base_ded1':{'type':'int','tags':[]},  # intracomunitar servicii
+                                           'base_ded2':{'type':'int','tags':[]},  # intracomunitar bunuri
                                            'base_19':{'type':'int','tags':['-09_1 - BAZA','+09_1 - BAZA']},
                                            'base_9':{'type':'int','tags':['-10_1 - BAZA','+10_1 - BAZA']},
                                            'base_5':{'type':'int','tags':['-11_1 - BAZA','+11_1 - BAZA']},
                                            'base_0':{'type':'int','tags':['-14 - BAZA','+14 - BAZA']},
 
-                                           'tva_neex':{'type':'int','tags':[]}, 
-                                           'tva_exig':{'type':'int','tags':[]},                      
                                            'tva_19': {'type':'int','tags':['-09_1 - TVA','+09_1 - TVA']},
                                            'tva_9':{'type':'int','tags':['-10_1 - TVA','+10_1 - TVA']}, 
                                            'tva_5':{'type':'int','tags':['-11_1 - TVA','+11_1 - TVA']}, 
@@ -92,23 +99,28 @@ class SaleJournalReport(models.TransientModel):
 
                                            'invers':{'type':'int','tags':['-13 - BAZA','+13 - BAZA']}, 
                                            'neimp':{'type':'int','tags':[]}, 
-                                           'others':{'type':'int','tags':[]}, 
-                                           'scutit1':{'type':'int','tags':[]}, 
-                                           'scutit2':{'type':'int','tags':[]},
+                                           'others':{'type':'int','tags':[]},
+                                            
+                                           'scutit1':{'type':'int','tags':['-14 - BAZA','+14 - BAZA']}, # cu drept de deducere 
+                                           'scutit2':{'type':'int','tags':['-15 - BAZA','+15 - BAZA']}, # fara drept de deducere
 
                                            'payments':{'type':'list','tags':[]},
 
                                            'warnings':{'type':'char','tags':[]}
                                            }
         sumed_columns = {
-                        "total_base": ['base_19','base_9','base_5','base_0'],
-                        "total_vat": ['tva_19', 'tva_9', 'tva_5', 'tva_bun','tva_serv',]}  # must be int
+                        "total_base": ['base_19','base_9','base_5','base_0','base_exig'],
+                        "total_vat": ['tva_19', 'tva_9', 'tva_5', 'tva_bun','tva_serv','tva_exig']}  # must be int
         all_known_tags = {}
         for k,v in sale_and_purchase_comun_columns.items():
             for tag in v['tags']:
                 if tag in all_known_tags.keys():
-                    raise ValidationError(f"tag {tag} exist in column {k} but also in column {all_known_tags(tag)}")
-                all_known_tags[tag] = k
+                    all_known_tags[tag] += [k]
+                    warn = f"tag='{tag}' exist in column={k} but also in column='{all_known_tags[tag]}'"
+                    _logger.warning(warn)
+                    #raise ValidationError(warn )
+                else:
+                    all_known_tags[tag] = [k]
 
         empty_row = {k:0 for k in sumed_columns}
         empty_row.update( {k:0 for k,v in sale_and_purchase_comun_columns.items() if v['type']=='int' }) 
@@ -130,6 +142,9 @@ class SaleJournalReport(models.TransientModel):
             for line in inv1.line_ids:
                 if line.display_type in ['line_section', 'line_note']:
                     continue
+                if not line.tax_exigible:
+                    vals['warnings'] = 'this line is a tax on payment'
+                    # I must see how to do this to search payments ...
                 if line.account_id.code.startswith(
                     "411"
                 ) or line.account_id.code.startswith("401"):
@@ -147,10 +162,11 @@ class SaleJournalReport(models.TransientModel):
                     else:
                         for tag in line.tax_tag_ids:
                             if tag.name in all_known_tags.keys():
-                                vals[all_known_tags[tag.name]] =  sign*(line.credit - line.debit)
+                                for tagx in all_known_tags[tag.name]:
+                                    vals[tagx] =  sign*(line.credit - line.debit)
                                 unknown_line = False
                     if  unknown_line:
-                        vals['warnings'] += f"unknown report column for line {line.name} debit={line.debit} credit={line.credit};" 
+                        vals['warnings'] += f"unknown report column for line {line.name} debit={line.debit} credit={line.credit} TAGS{[x.name for x in line.tax_tag_ids]};" 
 
             # put the aggregated values
             for key, value in sumed_columns.items():
