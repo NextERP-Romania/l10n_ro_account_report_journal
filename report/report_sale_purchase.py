@@ -75,15 +75,15 @@ class SaleJournalReport(models.TransientModel):
                                            'base_ded1':{'type':'int','tags':[]},
                                            'base_ded2':{'type':'int','tags':[]},
                                            'base_19':{'type':'int','tags':['-09_1 - BAZA','+09_1 - BAZA']},
-                                           'base_9':{'type':'int','tags':[]},
-                                           'base_5':{'type':'int','tags':[]},
+                                           'base_9':{'type':'int','tags':['-10_1 - BAZA','+10_1 - BAZA']},
+                                           'base_5':{'type':'int','tags':['-11_1 - BAZA','+11_1 - BAZA']},
                                            'base_0':{'type':'int','tags':[]},
 
                                            'tva_neex':{'type':'int','tags':[]}, 
                                            'tva_exig':{'type':'int','tags':[]},                      
                                            'tva_19': {'type':'int','tags':['-09_1 - TVA','+09_1 - TVA']},
-                                           'tva_9':{'type':'int','tags':[]}, 
-                                           'tva_5':{'type':'int','tags':[]}, 
+                                           'tva_9':{'type':'int','tags':['-10_1 - TVA','+10_1 - TVA']}, 
+                                           'tva_5':{'type':'int','tags':['-11_1 - TVA','+11_1 - TVA']}, 
                                            'tva_bun':{'type':'int','tags':[]},
                                            'tva_serv':{'type':'int','tags':[]},
 
@@ -122,7 +122,7 @@ class SaleJournalReport(models.TransientModel):
             vals = deepcopy(empty_row)
             vals["number"] = inv1.name
             vals["date"] = inv1.invoice_date
-            vals["partner"] = inv1.invoice_partner_display_name
+            vals["partner"] = inv1.commercial_partner_id.name #invoice_partner_display_name
             vals["vat"] = inv1.invoice_partner_display_vat
             vals["total"] = sign*(inv1.amount_total_signed)
             vals["warnings"] = ""
