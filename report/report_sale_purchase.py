@@ -77,7 +77,7 @@ class SaleJournalReport(models.TransientModel):
                                            'base_19':{'type':'int','tags':['-09_1 - BAZA','+09_1 - BAZA']},
                                            'base_9':{'type':'int','tags':['-10_1 - BAZA','+10_1 - BAZA']},
                                            'base_5':{'type':'int','tags':['-11_1 - BAZA','+11_1 - BAZA']},
-                                           'base_0':{'type':'int','tags':[]},
+                                           'base_0':{'type':'int','tags':['-14 - BAZA','+14 - BAZA']},
 
                                            'tva_neex':{'type':'int','tags':[]}, 
                                            'tva_exig':{'type':'int','tags':[]},                      
@@ -128,6 +128,8 @@ class SaleJournalReport(models.TransientModel):
             vals["warnings"] = ""
 
             for line in inv1.line_ids:
+                if line.display_type in ['line_section', 'line_note']:
+                    continue
                 if line.account_id.code.startswith(
                     "411"
                 ) or line.account_id.code.startswith("401"):
@@ -138,12 +140,17 @@ class SaleJournalReport(models.TransientModel):
                             f"a value of  {sign*(-line.credit+line.debit)}"
                         )
                 else:
+                    unknown_line = True
                     if not line.tax_tag_ids:
                         vals['base_0'] += sign*(line.credit - line.debit)
+                        unknown_line = False
                     else:
                         for tag in line.tax_tag_ids:
                             if tag.name in all_known_tags.keys():
                                 vals[all_known_tags[tag.name]] =  sign*(line.credit - line.debit)
+                                unknown_line = False
+                    if  unknown_line:
+                        vals['warnings'] += f"unknown report column for line {line.name} debit={line.debit} credit={line.credit};" 
 
             # put the aggregated values
             for key, value in sumed_columns.items():
