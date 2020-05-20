@@ -2,7 +2,8 @@
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html).
 
 from odoo import api, fields, models
-
+from copy import deepcopy
+from odoo.exceptions import ValidationError
 
 class SaleJournalReport(models.TransientModel):
     _name = "report.l10n_ro_account_report_journal.report_sale_purchase"
@@ -15,14 +16,22 @@ class SaleJournalReport(models.TransientModel):
         company_id = data["form"]["company_id"]
         domain = [
             ("state", "=", "posted"),
-            ("invoice_date", ">=", date_from),
-            ("invoice_date", "<=", date_to),
             ("company_id", "=", company_id[0]),
         ]
         if journal_type == "sale":
             domain += [("move_type", "in", ["out_invoice", "out_refund", "out_receipt"])]
         elif journal_type == "purchase":
             domain += [("move_type", "in", ["in_invoice", "in_refund", "in_receipt"])]
+# all invoices in selected period
+        domain += ['|','&',
+            ("invoice_date", ">=", date_from),
+            ("invoice_date", "<=", date_to),
+        ]
+# vat on payment invoices: the invoices that are unpaied at start date
+        domain += [('id','>','1')]
+
+
+        
         return domain
 
     @api.model
@@ -33,13 +42,10 @@ class SaleJournalReport(models.TransientModel):
         journal_type = data["form"]["journal_type"]
         domain = self._get_journal_invoice_domain(data, journal_type)
         invoices = self.env["account.move"].search(domain, order="invoice_date, name")
-
         show_warnings = data["form"]["show_warnings"]
-
         report_type_sale = journal_type == "sale"
-        report_lines, totals = self.compute_report_lines(
-            invoices, data, show_warnings, report_type_sale
-        )
+
+        report_lines, totals = self.compute_report_lines(  invoices, data, show_warnings, report_type_sale)
 
         docargs = {
             "print_datetime": fields.datetime.now(),
@@ -63,51 +69,57 @@ class SaleJournalReport(models.TransientModel):
         # but if so, to be the same as account.account.tag name
         if not invoices:
             return [],{}
-        posible_tags = self.env["account.account.tag"].search_read(
-            [
-                ("country_id", "=", self.env.ref("base.ro").id),
-                ("applicability", "=", "taxes"),
-            ],
-            ["name"],
-        )
-        posible_tags += [{'name': 'no_tag_like_vat0'},
-                         {'name':'avans_clienti'}, 
-                         ]
         
-        posible_tags_just_names = [x["name"] for x in posible_tags]
-#         for x in posible_tags_just_names:
-#             print(f"'{x}'")
+        sale_and_purchase_comun_columns = { 'base_neex':{'type':'int','tags':[]},
+                                           'base_exig':{'type':'int','tags':[]},
+                                           'base_ded1':{'type':'int','tags':[]},
+                                           'base_ded2':{'type':'int','tags':[]},
+                                           'base_19':{'type':'int','tags':['-09_1 - BAZA','+09_1 - BAZA']},
+                                           'base_9':{'type':'int','tags':[]},
+                                           'base_5':{'type':'int','tags':[]},
+                                           'base_0':{'type':'int','tags':[]},
 
-        # future posbile_tags_in_sale & posbile_tags_in_purchase and
-        # if something not right
+                                           'tva_neex':{'type':'int','tags':[]}, 
+                                           'tva_exig':{'type':'int','tags':[]},                      
+                                           'tva_19': {'type':'int','tags':['-09_1 - TVA','+09_1 - TVA']},
+                                           'tva_9':{'type':'int','tags':[]}, 
+                                           'tva_5':{'type':'int','tags':[]}, 
+                                           'tva_bun':{'type':'int','tags':[]},
+                                           'tva_serv':{'type':'int','tags':[]},
 
-        # in aggregated_dict the key represent the new key that has as value list
-        # of keys that must be summed ( children)
-        aggregated_dict = {"total_base": [], "total_vat": []}
-        aggregated_dict["total_base"] = [
-            x
-            for x in posible_tags_just_names
-            if ("% (deductibila)" in x)
-            or ("+Baza TVA" in x and "%" == x[-1])
-            or ("-Baza TVA" in x and "%" == x[-1])
-        ]
-        aggregated_dict["total_vat"] = [
-            x
-            for x in posible_tags
-            if ("% (TVA colectata)" in x) or ("% (deductibila)" in x and "TVA" in x)
-        ]
+                                           'base_col':{'type':'int','tags':[]}, 
+                                           'tva_col':{'type':'int','tags':[]},
 
-        aggregated_dict['total_base'] = [x for x in posible_tags_just_names if (
-                            ('+Baza TVA' in x and ('%' == x[-1] or x[-15:] == '% (deductibila)')) or
-                            ('-Baza TVA' in x and ('%' == x[-1] or x[-15:] == '% (deductibila)'))  )]
-        aggregated_dict['total_vat'] = [x for x in posible_tags_just_names if (
-                            ("+TVA" == x[:4] and ('% (TVA colectata)' == x[-17:] or x[-15:]=='% (deductibila)')) or
-                            ("-TVA" == x[:4] and ('% (TVA colectata)' == x[-17:] or x[-15:]=='% (deductibila)'))     )]
+                                           'invers':{'type':'int','tags':[]}, 
+                                           'neimp':{'type':'int','tags':[]}, 
+                                           'others':{'type':'int','tags':[]}, 
+                                           'scutit1':{'type':'int','tags':[]}, 
+                                           'scutit2':{'type':'int','tags':[]},
+
+                                           'payments':{'type':'list','tags':[]},
+
+                                           'warnings':{'type':'char','tags':[]}
+                                           }
+        sumed_columns = {
+                        "total_base": ['base_19','base_9','base_5','base_0'],
+                        "total_vat": ['tva_19', 'tva_9', 'tva_5', 'tva_bun','tva_serv',]}  # must be int
+        all_known_tags = {}
+        for k,v in sale_and_purchase_comun_columns.items():
+            for tag in v['tags']:
+                if tag in all_known_tags.keys():
+                    raise ValidationError(f"tag {tag} exist in column {k} but also in column {all_known_tags(tag)}")
+                all_known_tags[tag] = k
+
+        empty_row = {k:0 for k in sumed_columns}
+        empty_row.update( {k:0 for k,v in sale_and_purchase_comun_columns.items() if v['type']=='int' }) 
+        empty_row.update( {k:'' for k,v in sale_and_purchase_comun_columns.items() if v['type']=='char' }) 
+        empty_row.update( {k:[] for k,v in sale_and_purchase_comun_columns.items() if v['type']=='list' }) 
+        
 
         sign = 1 if report_type_sale else -1
         report_lines = []
         for inv1 in invoices:
-            vals = {x: 0 for x in posible_tags_just_names}
+            vals = deepcopy(empty_row)
             vals["number"] = inv1.name
             vals["date"] = inv1.invoice_date
             vals["partner"] = inv1.invoice_partner_display_name
@@ -123,28 +135,18 @@ class SaleJournalReport(models.TransientModel):
                         vals["warnings"] += (
                             f"The value of invoice is {vals['total']} but "
                             f"accounting account {line.account_id.code} has "
-                            f"a value of  {line.credit-line.debit}"
+                            f"a value of  {sign*(-line.credit+line.debit)}"
                         )
                 else:
                     if not line.tax_tag_ids:
-                        vals['no_tag_like_vat0'] += sign*(line.credit - line.debit)
-                    elif len(line.tax_tag_ids) > 1: 
-                        vals["warnings"] += (
-                            f"line id={line.id} name={line.name}  does not "
-                            f"have line_tax_tag_ids or have more and I'm not "
-                            f"going to guess it ( maybe in future); "
-                        )
-                    elif line.tax_tag_ids[0].name not in posible_tags_just_names:
-                        vals["warnings"] += (
-                            f"this tax_tag_ids={line.tax_tag_ids[0].name} is not in "
-                            f"find_all_account_tax_report_line"
-                        )
+                        vals['base_0'] += sign*(line.credit - line.debit)
                     else:
-                        vals[line.tax_tag_ids[0].name] += sign*(line.credit - line.debit)
-                    if line.account_id.code.startswith("419"):
-                        vals['avans_clienti'] = (line.credit - line.debit) #!!!!!!!!!!!!!!! we put it only here or also at sum of bases 
+                        for tag in line.tax_tag_ids:
+                            if tag.name in all_known_tags.keys():
+                                vals[all_known_tags[tag.name]] =  sign*(line.credit - line.debit)
+
             # put the aggregated values
-            for key, value in aggregated_dict.items():
+            for key, value in sumed_columns.items():
                 vals[key] = sum([vals[x] for x in value])
 
             report_lines += [vals]
@@ -161,7 +163,7 @@ class SaleJournalReport(models.TransientModel):
 
 
         # make the totals dictionary for total line of table as sum of all the
-        # integer/int values of vals
+        # integer/float values of vals
         int_float_keys = []
         for key, value in report_lines[0].items():
             if (type(value) is int) or (type(value) is float):
@@ -171,79 +173,3 @@ class SaleJournalReport(models.TransientModel):
             totals[key] = round(sum([x[key] for x in report_lines]),2)
         return report_lines, totals
 #line.tax_exigible=False   means  tax.tax_exigibility == 'on_payment'
-"""
-not put into xml
-    used in xml
-    '-Baza TVA 0%'
-    '+Baza TVA 0%'
-    '-Baza TVA 19%'
-    '+Baza TVA 19%'
-    '-Baza TVA 24%'
-    '+Baza TVA 24%'
-    '-Baza TVA 5%'
-    '+Baza TVA 5%'
-    '-Baza TVA 9%'
-    '+Baza TVA 9%'
-'-Baza TVA Intracomunitar Bunuri'
-'+Baza TVA Intracomunitar Bunuri'
-'-Baza TVA Intracomunitar Servicii'
-'+Baza TVA Intracomunitar Servicii'
-    '-Baza TVA Taxare Inversa'
-    '+Baza TVA Taxare Inversa'
-    '-TVA 0% (TVA colectata)'
-    '+TVA 0% (TVA colectata)'
-    '-TVA 19% (TVA colectata)'
-    '+TVA 19% (TVA colectata)'
-    '-TVA 24% (TVA colectata)'
-    '+TVA 24% (TVA colectata)'
-    '-TVA 5% (TVA colectata)'
-    '+TVA 5% (TVA colectata)'
-    '-TVA 9% (TVA colectata)'
-    '+TVA 9% (TVA colectata)'
-'-TVA Intracomunitar Bunuri (TVA colectata)'
-'+TVA Intracomunitar Bunuri (TVA colectata)'
-'-TVA Intracomunitar Servicii (TVA colectata)'
-'+TVA Intracomunitar Servicii (TVA colectata)'
-    '-TVA Taxare Inversa (TVA colectata)'
-    '+TVA Taxare Inversa (TVA colectata)'
-    '-Baza TVA 0% (deductibila)'
-    '+Baza TVA 0% (deductibila)'
-    '-Baza TVA 19% (deductibila)'
-    '+Baza TVA 19% (deductibila)'
-    '-Baza TVA 24% (deductibila)'
-    '+Baza TVA 24% (deductibila)'
-    '-Baza TVA 5% (deductibila)'
-    '+Baza TVA 5% (deductibila)'
-    '-Baza TVA 9% (deductibila)'
-    '+Baza TVA 9% (deductibila)'
-    '-Baza TVA Intracomunitar Bunuri (deductibila)'
-    '+Baza TVA Intracomunitar Bunuri (deductibila)'
-    '-Baza TVA Intracomunitar Servicii (deductibila)'
-    '+Baza TVA Intracomunitar Servicii (deductibila)'
-    '-Baza TVA Taxare Inversa (deductibila)'
-    '+Baza TVA Taxare Inversa (deductibila)'
-'-TVA 0%'
-'+TVA 0%'
-    '-TVA 19% (deductibila)'
-    '+TVA 19% (deductibila)'
-    '-TVA 24% (deductibila)'
-    '+TVA 24% (deductibila)'
-    '-TVA 5% (deductibila)'
-    '+TVA 5% (deductibila)'
-    '-TVA 9% (deductibila)'
-    '+TVA 9% (deductibila)'
-    '-TVA Intracomunitar Bunuri (deductibila)'
-    '+TVA Intracomunitar Bunuri (deductibila)'
-    '-TVA Intracomunitar Servicii (deductibila)'
-    '+TVA Intracomunitar Servicii (deductibila)'
-    '-TVA Taxare Inversa (deductibila)'
-    '+TVA Taxare Inversa (deductibila)'
-    '-Baza TVA Taxare Scutita - Achizitii'
-    '+Baza TVA Taxare Scutita - Achizitii'
-'-Baza TVA Taxare Scutita - Vanzari'
-'+Baza TVA Taxare Scutita - Vanzari'
-    '-Baza TVA Taxare intracomunitara neimpozabila - Achizitii'
-    '+Baza TVA Taxare intracomunitara neimpozabila - Achizitii'
-    '-Baza TVA Taxare intracomunitara neimpozabila - Vanzari'
-    '+Baza TVA Taxare intracomunitara neimpozabila - Vanzari'
-"""
