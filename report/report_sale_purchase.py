@@ -90,7 +90,7 @@ class SaleJournalReport(models.TransientModel):
                                            'base_col':{'type':'int','tags':[]}, 
                                            'tva_col':{'type':'int','tags':[]},
 
-                                           'invers':{'type':'int','tags':[]}, 
+                                           'invers':{'type':'int','tags':['-13 - BAZA','+13 - BAZA']}, 
                                            'neimp':{'type':'int','tags':[]}, 
                                            'others':{'type':'int','tags':[]}, 
                                            'scutit1':{'type':'int','tags':[]}, 
