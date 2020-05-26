@@ -50,7 +50,7 @@
 </template>
 
 <template id="l10n_ro_account_report_journal.vat_on_payment_columns">
-                           <td colspan="7">
+                           <td colspan="5">
                                 <!--                              <t t-if="l['payments']">
                                                              <table width="100%">
                                                                  <tr t-foreach="l['payments']" t-as="pay">
@@ -75,17 +75,13 @@
                                                              </table>
                                                              </t>
                                    
-                               </td>
-                             <td >
-                                <t  t-set="base_neex"
-                                    t-value="l.get('+Baza TVA Taxare Scutita - Achizitii', 0) + l.get('-Baza TVA Taxare Scutita - Achizitii', 0)" />
-                                <span t-esc="base_neex" />
+                              --> </td>
+                            <td>
+                                <span t-esc="l['base_neex']" />
                             </td>
                             <td >
-                                <t t-set="tva_neex" t-value="'not_tag_ids'" />
-                                <span t-esc="tva_neex" />
-                            </td> -->
-                          </td>
+                                <span t-esc="l['tva_neex']" />
+                           </td>
 </template>
 
 

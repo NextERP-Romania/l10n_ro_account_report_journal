@@ -54,6 +54,7 @@ class SaleJournalReport(models.TransientModel):
             ])
         vat_on_payment_reconcile=[] # partial_reconcile object accounting notes for vat_on_payment  that is going to be owed to state
         payments = []  # account_move of payments reconciled with a invoice that has vat_on_payment
+        invoices_for_payments = []
         for all_tax_cash_basis_journal_move_id in all_tax_cash_basis_journal_move_ids:
             partial_reconcile = all_tax_cash_basis_journal_move_id.tax_cash_basis_rec_id
             debit_move_id = partial_reconcile.debit_move_id.move_id 
@@ -62,17 +63,19 @@ class SaleJournalReport(models.TransientModel):
             credit_journal_type = credit_move_id.journal_id.type
             if debit_journal_type == journal_type:
                 invoices_with_tax_cash_basis_ids.append(debit_move_id.id )
+                invoices_for_payments += [debit_move_id]
                 vat_on_payment_reconcile +=  [all_tax_cash_basis_journal_move_id]
                 payments += credit_move_id
             elif credit_journal_type==journal_type:
                 invoices_with_tax_cash_basis_ids.append(credit_move_id.id )
+                invoices_for_payments += [credit_move_id]
                 vat_on_payment_reconcile += [all_tax_cash_basis_journal_move_id]
                 payments +=  debit_move_id
                 
 
         final_domain = ['|',('id','in',invoices_with_tax_cash_basis_ids),'&','&','&','&'] + invoices_in_period_domain  
         invoices_for_report = self.env["account.move"].search(final_domain, order="invoice_date, name")
-        return invoices_for_report,payments,vat_on_payment_reconcile
+        return invoices_for_report,payments,vat_on_payment_reconcile, invoices_for_payments
 
     @api.model
     def _get_report_values(self, docids, data=None):
@@ -80,14 +83,14 @@ class SaleJournalReport(models.TransientModel):
         date_from = data["form"]["date_from"]
         date_to = data["form"]["date_to"]
         journal_type = data["form"]["journal_type"]
-        invoices,payments,vat_on_payment_reconcile = self._get_forreport_invoices_payments(data, journal_type)
+        invoices,payments,vat_on_payment_reconcile,invoices_for_payments = self._get_forreport_invoices_payments(data, journal_type)
 #        invoices = self.env["account.move"].search(domain, order="invoice_date, name")
         
         
         show_warnings = data["form"]["show_warnings"]
         report_type_sale = journal_type == "sale"
 
-        report_lines, totals = self.compute_report_lines(  invoices,payments,vat_on_payment_reconcile, data, show_warnings, report_type_sale)
+        report_lines, totals = self.compute_report_lines(  invoices,payments,vat_on_payment_reconcile, invoices_for_payments,data, show_warnings, report_type_sale)
 
         docargs = {
             "print_datetime": fields.datetime.now(),
@@ -102,7 +105,7 @@ class SaleJournalReport(models.TransientModel):
         }
         return docargs
 
-    def compute_report_lines( self, invoices,payments,vat_on_payment_reconcile, data, show_warnings, report_type_sale=True ):
+    def compute_report_lines( self, invoices,payments,vat_on_payment_reconcile,invoices_for_payments, data, show_warnings, report_type_sale=True ):
         """input:
         invoices = account.move list of invoices to be showed in report
         payments = account.move list of payments done on vat_on_payment invoices
@@ -118,8 +121,8 @@ class SaleJournalReport(models.TransientModel):
         if not invoices:
             return [],{}
         
-        sale_and_purchase_comun_columns = { 'base_neex':{'type':'int','tags':[]}, # vat on payment
-                                           'tva_neex':{'type':'int','tags':[]}, 
+        sale_and_purchase_comun_columns = { 'base_neex':{'type':'int','tags':['-09_1 - BAZA','+09_1 - BAZA', '-10_1 - BAZA','+10_1 - BAZA', '-11_1 - BAZA','+11_1 - BAZA' ]}, # vat on payment
+                                           'tva_neex':{'type':'int','tags':[ '-09_1 - TVA','+09_1 - TVA', '-10_1 - TVA','+10_1 - TVA', '-11_1 - TVA','+11_1 - TVA']}, 
 
                                            'tva_exig':{'type':'int','tags':[]},  # what was payed   =sum of base                  
                                            'base_exig':{'type':'int','tags':[]},  # vat on payment =sum of vat
@@ -155,7 +158,8 @@ class SaleJournalReport(models.TransientModel):
                                            }
         sumed_columns = {
                         "total_base": ['base_19','base_9','base_5','base_0','base_exig'],
-                        "total_vat": ['tva_19', 'tva_9', 'tva_5', 'tva_bun','tva_serv','tva_exig']}  # must be int
+                        "total_vat": ['tva_19', 'tva_9', 'tva_5', 'tva_bun','tva_serv','tva_exig'],
+                        }  # must be int
         all_known_tags = {}
         for k,v in sale_and_purchase_comun_columns.items():
             for tag in v['tags']:
@@ -178,18 +182,15 @@ class SaleJournalReport(models.TransientModel):
         for inv1 in invoices:
             vals = deepcopy(empty_row)
             vals["number"] = inv1.name
+            vals["tax_exigible"] = True
             vals["date"] = inv1.invoice_date
             vals["partner"] = inv1.commercial_partner_id.name #invoice_partner_display_name
             vals["vat"] = inv1.invoice_partner_display_vat
             vals["total"] = sign*(inv1.amount_total_signed)
             vals["warnings"] = ""
-
             for line in inv1.line_ids:
                 if line.display_type in ['line_section', 'line_note']:
                     continue
-                if not line.tax_exigible:
-                    vals['warnings'] += 'this line is a tax on payment\n'
-                    # I must see how to do this to search payments ...
                 if line.account_id.code.startswith(
                     "411"
                 ) or line.account_id.code.startswith("401"):
@@ -201,21 +202,36 @@ class SaleJournalReport(models.TransientModel):
                         )
                 else:
                     unknown_line = True
-                    if not line.tax_tag_ids:
-                        vals['base_0'] += sign*(line.credit - line.debit)
-                        unknown_line = False
-                    else:
+                    if not line.tax_exigible:  # vat on payment
+                        #vals['warnings'] += 'this line is a tax on payment\n'
+                        vals['tax_exigible'] = False
                         for tag in line.tax_tag_ids:
-                            if tag.name in all_known_tags.keys():
-                                for tagx in all_known_tags[tag.name]:
-                                    vals[tagx] =  sign*(line.credit - line.debit)
+                            if tag.name in sale_and_purchase_comun_columns['base_neex']['tags']:
+                                vals['base_neex'] += sign*(line.credit - line.debit)
                                 unknown_line = False
-                    if  unknown_line:
-                        vals['warnings'] += f"unknown report column for line {line.name} debit={line.debit} credit={line.credit} TAGS{[x.name for x in line.tax_tag_ids]};" 
+                            elif tag.name in sale_and_purchase_comun_columns['tva_neex']['tags']:
+                                vals['tva_neex'] += sign*(line.credit - line.debit)
+                                unknown_line = False
+                        
+                        # I must see how to do this to search payments ...
+                    else: # NOT vat on payment
+                        if not line.tax_tag_ids:
+                            vals['base_0'] += sign*(line.credit - line.debit)
+                            unknown_line = False
+                        else:
+                            for tag in line.tax_tag_ids:
+                                if tag.name in all_known_tags.keys():
+                                    for tagx in all_known_tags[tag.name]:
+                                        vals[tagx] =  sign*(line.credit - line.debit)
+                                    unknown_line = False
+                        if  unknown_line:
+                            vals['warnings'] += f"unknown report column for line {line.name} debit={line.debit} credit={line.credit} TAGS{[x.name for x in line.tax_tag_ids]};" 
 
             # put the aggregated values
             for key, value in sumed_columns.items():
                 vals[key] = sum([vals[x] for x in value])
+            # till we take into account the payments, not exigible is equal with total_base, total_vat
+
 
             report_lines += [vals]
 # # print extracted               for testing
@@ -228,6 +244,10 @@ class SaleJournalReport(models.TransientModel):
 #                 else:
 #                     continue
 #             print(text_antet+text)
+
+# put also the payments
+        for payment in zip(payments,vat_on_payment_reconcile):
+            print("xxx") 
 
 
         # make the totals dictionary for total line of table as sum of all the
