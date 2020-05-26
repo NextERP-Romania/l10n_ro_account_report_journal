@@ -6,7 +6,8 @@ from copy import deepcopy
 from odoo.exceptions import ValidationError
 import logging
 _logger = logging.getLogger(__name__)
-
+from datetime  import datetime
+from odoo.tools import DEFAULT_SERVER_DATE_FORMAT
 
 class SaleJournalReport(models.TransientModel):
     _name = "report.l10n_ro_account_report_journal.report_sale_purchase"
@@ -120,6 +121,7 @@ class SaleJournalReport(models.TransientModel):
         # but if so, to be the same as account.account.tag name
         if not invoices:
             return [],{}
+        account_partial_reconcile_obj = self.env['account.partial.reconcile']
         
         sale_and_purchase_comun_columns = { 'base_neex':{'type':'int','tags':['-09_1 - BAZA','+09_1 - BAZA', '-10_1 - BAZA','+10_1 - BAZA', '-11_1 - BAZA','+11_1 - BAZA' ]}, # vat on payment
                                            'tva_neex':{'type':'int','tags':[ '-09_1 - TVA','+09_1 - TVA', '-10_1 - TVA','+10_1 - TVA', '-11_1 - TVA','+11_1 - TVA']}, 
@@ -188,6 +190,12 @@ class SaleJournalReport(models.TransientModel):
             vals["vat"] = inv1.invoice_partner_display_vat
             vals["total"] = sign*(inv1.amount_total_signed)
             vals["warnings"] = ""
+# search the reconcile line
+            reconcile_account_move_line_id = False
+            for line in inv1.line_ids:
+                if line.account_id.code.startswith("411") or line.account_id.code.startswith("401"):
+                    reconcile_account_move_line_id = line.id
+                    break
             for line in inv1.line_ids:
                 if line.display_type in ['line_section', 'line_note']:
                     continue
@@ -207,11 +215,34 @@ class SaleJournalReport(models.TransientModel):
                         vals['tax_exigible'] = False
                         for tag in line.tax_tag_ids:
                             if tag.name in sale_and_purchase_comun_columns['base_neex']['tags']:
-                                vals['base_neex'] += sign*(line.credit - line.debit)
+                                vals['base_neex'] += round(sign*(line.credit - line.debit),2)
                                 unknown_line = False
                             elif tag.name in sale_and_purchase_comun_columns['tva_neex']['tags']:
-                                vals['tva_neex'] += sign*(line.credit - line.debit)
+                                vals['tva_neex'] += round(sign*(line.credit - line.debit),2)
                                 unknown_line = False
+# find all the reconciliation till date from
+# if reconciliation less than period, will just decrease the base_neex and tva_neex
+                        all_reconcile = account_partial_reconcile_obj.search([
+                            '|',('debit_move_id','=',reconcile_account_move_line_id) ,('credit_move_id','=',reconcile_account_move_line_id),
+                            ('company_id','=',data["form"]["company_id"][0]),
+                            ('max_date','<=',data["form"]["date_to"]),  ])
+                        all_reconcile_ids = [x.id for x in all_reconcile]
+                        for move in self.env['account.move'].search([('tax_cash_basis_rec_id', 'in', all_reconcile_ids)]):
+                            if move.date < datetime.strptime(data["form"]["date_from"], DEFAULT_SERVER_DATE_FORMAT).date() :
+                                for move_line in move.line_ids:
+                                    for tag in move_line.tax_tag_ids:
+                                        if tag.name in sale_and_purchase_comun_columns['base_neex']['tags']:
+                                            vals['base_neex'] -= round(sign*(move_line.credit - move_line.debit),2)
+                                        elif tag.name in sale_and_purchase_comun_columns['tva_neex']['tags']:
+                                            vals['tva_neex'] -= round(sign*(move_line.credit - move_line.debit),2)
+                            else:  # is payment in period and we are going also to show it
+                                vals['payments'] += [{'number':move.ref ,'date': move.date,'total':move.amount_total,'base':0,'tva':0}]
+                                for move_line in move.line_ids:
+                                    for tag in move_line.tax_tag_ids:
+                                        if tag.name in all_known_tags.keys():
+                                            for tagx in all_known_tags[tag.name]:
+                                                vals[tagx] +=  round(sign*(move_line.credit - move_line.debit),2)
+                                  
                         
                         # I must see how to do this to search payments ...
                     else: # NOT vat on payment
@@ -222,10 +253,14 @@ class SaleJournalReport(models.TransientModel):
                             for tag in line.tax_tag_ids:
                                 if tag.name in all_known_tags.keys():
                                     for tagx in all_known_tags[tag.name]:
-                                        vals[tagx] =  sign*(line.credit - line.debit)
+                                        vals[tagx] +=  sign*(line.credit - line.debit)
                                     unknown_line = False
                         if  unknown_line:
                             vals['warnings'] += f"unknown report column for line {line.name} debit={line.debit} credit={line.credit} TAGS{[x.name for x in line.tax_tag_ids]};" 
+
+# here if the invoice is vat on payment, we are going to find all the reconciled payments on this 
+# we must find all the reconciled because 
+
 
             # put the aggregated values
             for key, value in sumed_columns.items():
