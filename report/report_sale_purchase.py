@@ -13,29 +13,66 @@ class SaleJournalReport(models.TransientModel):
     _description = "Report Sale Purchase Journal"
 
     @api.model
-    def _get_journal_invoice_domain(self, data, journal_type):
+    def _get_forreport_invoices_payments(self, data, journal_type):
+        account_move_obj = self.env['account.move']
         date_from = data["form"]["date_from"]
         date_to = data["form"]["date_to"]
-        company_id = data["form"]["company_id"]
-        domain = [
-            ("state", "=", "posted"),
-            ("company_id", "=", company_id[0]),
-        ]
+        company_id = self.env['res.company'].browse(data["form"]["company_id"][0])
+
         if journal_type == "sale":
-            domain += [("move_type", "in", ["out_invoice", "out_refund", "out_receipt"])]
+            sale_purchase_domain =[("move_type", "in", ["out_invoice", "out_refund", "out_receipt"])]
         elif journal_type == "purchase":
-            domain += [("move_type", "in", ["in_invoice", "in_refund", "in_receipt"])]
-# all invoices in selected period
-        domain += ['|','&',
-            ("invoice_date", ">=", date_from),
-            ("invoice_date", "<=", date_to),
-        ]
-# vat on payment invoices: the invoices that are unpaied at start date
-        domain += [('id','>','1')]
+            sale_purchase_domain =[("move_type", "in", ["in_invoice", "in_refund", "in_receipt"])]
 
+# invoices in period
+        general_domain = [ ("state", "=", "posted"),
+            ("company_id", "=", company_id.id),]
+        invoices_in_period_domain = general_domain + sale_purchase_domain + [("invoice_date", ">=", date_from), ("invoice_date", "<=", date_to)]
 
-        
-        return domain
+        invoices_with_tax_cash_basis_ids = []  # id's to take also the invoices that are not in selected period
+# invoices that are older than the start date and not paid if they have vat on payment must appear into this report
+        older_unpaid_invoices =  account_move_obj.search ([
+            ("state", "=", "posted"),
+            ("company_id", "=", company_id.id),
+            ("invoice_date", "<", date_from),
+            ('payment_state','in',['partial','not_paid']),])
+        for upaid_invoice in older_unpaid_invoices:
+            for line_id in upaid_invoice.invoice_line_ids:
+                if line_id.display_type in ['line_section', 'line_note']:
+                    continue
+                if not line_id.tax_exigible:
+                    invoices_with_tax_cash_basis_ids.append( upaid_invoice.id)
+                    break 
+
+#reconciled payments for vat_on_payment that exist in this period, and we must put them into report.
+# this payments can be for some in invoices that are not in 
+        all_tax_cash_basis_journal_move_ids = account_move_obj.search( general_domain  +[
+            ('journal_id','=',company_id.tax_cash_basis_journal_id.id ),
+            ("move_type", "in", ["entry"]) ,
+            ("date", ">=", date_from), 
+            ("date", "<=", date_to),
+            ])
+        vat_on_payment_reconcile=[] # partial_reconcile object accounting notes for vat_on_payment  that is going to be owed to state
+        payments = []  # account_move of payments reconciled with a invoice that has vat_on_payment
+        for all_tax_cash_basis_journal_move_id in all_tax_cash_basis_journal_move_ids:
+            partial_reconcile = all_tax_cash_basis_journal_move_id.tax_cash_basis_rec_id
+            debit_move_id = partial_reconcile.debit_move_id.move_id 
+            credit_move_id = partial_reconcile.credit_move_id.move_id
+            debit_journal_type = debit_move_id.journal_id.type
+            credit_journal_type = credit_move_id.journal_id.type
+            if debit_journal_type == journal_type:
+                invoices_with_tax_cash_basis_ids.append(debit_move_id.id )
+                vat_on_payment_reconcile +=  [all_tax_cash_basis_journal_move_id]
+                payments += credit_move_id
+            elif credit_journal_type==journal_type:
+                invoices_with_tax_cash_basis_ids.append(credit_move_id.id )
+                vat_on_payment_reconcile += [all_tax_cash_basis_journal_move_id]
+                payments +=  debit_move_id
+                
+
+        final_domain = ['|',('id','in',invoices_with_tax_cash_basis_ids),'&','&','&','&'] + invoices_in_period_domain  
+        invoices_for_report = self.env["account.move"].search(final_domain, order="invoice_date, name")
+        return invoices_for_report,payments,vat_on_payment_reconcile
 
     @api.model
     def _get_report_values(self, docids, data=None):
@@ -43,12 +80,14 @@ class SaleJournalReport(models.TransientModel):
         date_from = data["form"]["date_from"]
         date_to = data["form"]["date_to"]
         journal_type = data["form"]["journal_type"]
-        domain = self._get_journal_invoice_domain(data, journal_type)
-        invoices = self.env["account.move"].search(domain, order="invoice_date, name")
+        invoices,payments,vat_on_payment_reconcile = self._get_forreport_invoices_payments(data, journal_type)
+#        invoices = self.env["account.move"].search(domain, order="invoice_date, name")
+        
+        
         show_warnings = data["form"]["show_warnings"]
         report_type_sale = journal_type == "sale"
 
-        report_lines, totals = self.compute_report_lines(  invoices, data, show_warnings, report_type_sale)
+        report_lines, totals = self.compute_report_lines(  invoices,payments,vat_on_payment_reconcile, data, show_warnings, report_type_sale)
 
         docargs = {
             "print_datetime": fields.datetime.now(),
@@ -63,8 +102,14 @@ class SaleJournalReport(models.TransientModel):
         }
         return docargs
 
-    def compute_report_lines( self, invoices, data, show_warnings, report_type_sale=True ):
-        """returns a list of a dictionary for table with the key as column
+    def compute_report_lines( self, invoices,payments,vat_on_payment_reconcile, data, show_warnings, report_type_sale=True ):
+        """input:
+        invoices = account.move list of invoices to be showed in report
+        payments = account.move list of payments done on vat_on_payment invoices
+        vat_on_payment_reconcile = partial.reconcile  list of efective accounting moves that are telling what taxes are to be paid 
+        data = dictionary with selected options like date_from, date_to, company...
+        
+        returns a list of a dictionary for table with the key as column
         and total dictionary with the sums of columns """
         # self.ensure_one()
         # find all the keys for dictionary
@@ -143,7 +188,7 @@ class SaleJournalReport(models.TransientModel):
                 if line.display_type in ['line_section', 'line_note']:
                     continue
                 if not line.tax_exigible:
-                    vals['warnings'] = 'this line is a tax on payment'
+                    vals['warnings'] += 'this line is a tax on payment\n'
                     # I must see how to do this to search payments ...
                 if line.account_id.code.startswith(
                     "411"
