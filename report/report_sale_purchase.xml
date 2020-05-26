@@ -51,31 +51,30 @@
 
 <template id="l10n_ro_account_report_journal.vat_on_payment_columns">
                            <td colspan="5">
-                                <!--                              <t t-if="l['payments']">
-                                                             <table width="100%">
-                                                                 <tr t-foreach="l['payments']" t-as="pay">
-                                                                     <td  width="30">
-                                                                         <t t-if="pay['number']!=''"><span t-esc="pay['number'].rjust(10,' ')"/></t>
-                                                                         <t t-if="pay['number']==''">...........</t>
-                                                                     </td>
-                                                                     <td  width="30">
-                                                                         <t t-if="pay['date']!=''"><span t-esc="pay['date']"/></t>
-                                                                         <t t-if="pay['date']==''">...........</t>
-                                                                     </td>
-                                                                     <td >
-                                                                         <span t-esc="pay['amount']"/>
-                                                                     </td>
-                                                                     <td >
-                                                                         <span t-esc="pay['base_exig']"/>
-                                                                     </td>
-                                                                     <td >
-                                                                         <span t-esc="pay['tva_exig']"/>
-                                                                     </td>
-                                                                 </tr>
-                                                             </table>
-                                                             </t>
+                                        <t t-if="l['payments']">
+
+                                            <table width="100%">
+                                               <tr t-foreach="l['payments']" t-as="pay">
+                                                   <td  >
+                                                       <span t-esc="pay['number']"/>
+                                                   </td>
+                                                   <td >
+                                                       <span t-esc="pay['date']"/>
+                                                   </td>
+                                                   <td >
+                                                       <span t-esc="pay['amount']"/>
+                                                   </td>
+                                                   <td >
+                                                       <span t-esc="pay['base_exig']"/>
+                                                   </td>
+                                                   <td >
+                                                       <span t-esc="pay['tva_exig']"/>
+                                                   </td>
+                                               </tr>
+                                           </table>
+                                        </t>
                                    
-                              --> </td>
+                             </td>
                             <td>
                                 <span t-esc="l['base_neex']" />
                             </td>

@@ -31,6 +31,7 @@ class SaleJournalReport(models.TransientModel):
         invoices_in_period_domain = general_domain + sale_purchase_domain + [("invoice_date", ">=", date_from), ("invoice_date", "<=", date_to)]
 
         invoices_with_tax_cash_basis_ids = []  # id's to take also the invoices that are not in selected period
+
 # invoices that are older than the start date and not paid if they have vat on payment must appear into this report
         older_unpaid_invoices =  account_move_obj.search ([
             ("state", "=", "posted"),
@@ -47,15 +48,11 @@ class SaleJournalReport(models.TransientModel):
 
 #reconciled payments for vat_on_payment that exist in this period, and we must put them into report.
 # this payments can be for some in invoices that are not in 
-        all_tax_cash_basis_journal_move_ids = account_move_obj.search( general_domain  +[
+        all_tax_cash_basis_journal_move_ids = account_move_obj.search( general_domain + [
             ('journal_id','=',company_id.tax_cash_basis_journal_id.id ),
             ("move_type", "in", ["entry"]) ,
             ("date", ">=", date_from), 
-            ("date", "<=", date_to),
-            ])
-        vat_on_payment_reconcile=[] # partial_reconcile object accounting notes for vat_on_payment  that is going to be owed to state
-        payments = []  # account_move of payments reconciled with a invoice that has vat_on_payment
-        invoices_for_payments = []
+            ("date", "<=", date_to),  ])
         for all_tax_cash_basis_journal_move_id in all_tax_cash_basis_journal_move_ids:
             partial_reconcile = all_tax_cash_basis_journal_move_id.tax_cash_basis_rec_id
             debit_move_id = partial_reconcile.debit_move_id.move_id 
@@ -64,19 +61,13 @@ class SaleJournalReport(models.TransientModel):
             credit_journal_type = credit_move_id.journal_id.type
             if debit_journal_type == journal_type:
                 invoices_with_tax_cash_basis_ids.append(debit_move_id.id )
-                invoices_for_payments += [debit_move_id]
-                vat_on_payment_reconcile +=  [all_tax_cash_basis_journal_move_id]
-                payments += credit_move_id
             elif credit_journal_type==journal_type:
                 invoices_with_tax_cash_basis_ids.append(credit_move_id.id )
-                invoices_for_payments += [credit_move_id]
-                vat_on_payment_reconcile += [all_tax_cash_basis_journal_move_id]
-                payments +=  debit_move_id
                 
 
         final_domain = ['|',('id','in',invoices_with_tax_cash_basis_ids),'&','&','&','&'] + invoices_in_period_domain  
         invoices_for_report = self.env["account.move"].search(final_domain, order="invoice_date, name")
-        return invoices_for_report,payments,vat_on_payment_reconcile, invoices_for_payments
+        return invoices_for_report
 
     @api.model
     def _get_report_values(self, docids, data=None):
@@ -84,14 +75,14 @@ class SaleJournalReport(models.TransientModel):
         date_from = data["form"]["date_from"]
         date_to = data["form"]["date_to"]
         journal_type = data["form"]["journal_type"]
-        invoices,payments,vat_on_payment_reconcile,invoices_for_payments = self._get_forreport_invoices_payments(data, journal_type)
+        invoices = self._get_forreport_invoices_payments(data, journal_type)
 #        invoices = self.env["account.move"].search(domain, order="invoice_date, name")
         
         
         show_warnings = data["form"]["show_warnings"]
         report_type_sale = journal_type == "sale"
 
-        report_lines, totals = self.compute_report_lines(  invoices,payments,vat_on_payment_reconcile, invoices_for_payments,data, show_warnings, report_type_sale)
+        report_lines, totals = self.compute_report_lines(  invoices,data, show_warnings, report_type_sale)
 
         docargs = {
             "print_datetime": fields.datetime.now(),
@@ -106,7 +97,7 @@ class SaleJournalReport(models.TransientModel):
         }
         return docargs
 
-    def compute_report_lines( self, invoices,payments,vat_on_payment_reconcile,invoices_for_payments, data, show_warnings, report_type_sale=True ):
+    def compute_report_lines( self, invoices, data, show_warnings, report_type_sale=True ):
         """input:
         invoices = account.move list of invoices to be showed in report
         payments = account.move list of payments done on vat_on_payment invoices
@@ -196,6 +187,7 @@ class SaleJournalReport(models.TransientModel):
                 if line.account_id.code.startswith("411") or line.account_id.code.startswith("401"):
                     reconcile_account_move_line_id = line.id
                     break
+# take all the lines and put them into dictionary            
             for line in inv1.line_ids:
                 if line.display_type in ['line_section', 'line_note']:
                     continue
@@ -236,7 +228,7 @@ class SaleJournalReport(models.TransientModel):
                                         elif tag.name in sale_and_purchase_comun_columns['tva_neex']['tags']:
                                             vals['tva_neex'] -= round(sign*(move_line.credit - move_line.debit),2)
                             else:  # is payment in period and we are going also to show it
-                                vals['payments'] += [{'number':move.ref ,'date': move.date,'total':move.amount_total,'base':0,'tva':0}]
+                                vals['payments'] += [{'number':move.ref ,'date': move.date,'amount':move.amount_total,'base_exig':0,'tva_exig':0}]
                                 for move_line in move.line_ids:
                                     for tag in move_line.tax_tag_ids:
                                         if tag.name in all_known_tags.keys():
@@ -280,13 +272,9 @@ class SaleJournalReport(models.TransientModel):
 #                     continue
 #             print(text_antet+text)
 
-# put also the payments
-        for payment in zip(payments,vat_on_payment_reconcile):
-            print("xxx") 
 
-
-        # make the totals dictionary for total line of table as sum of all the
-        # integer/float values of vals
+# make the totals dictionary for total line of table as sum of all the
+# integer/float values of vals
         int_float_keys = []
         for key, value in report_lines[0].items():
             if (type(value) is int) or (type(value) is float):
@@ -294,5 +282,8 @@ class SaleJournalReport(models.TransientModel):
         totals = {}
         for key in int_float_keys:
             totals[key] = round(sum([x[key] for x in report_lines]),2)
+        totals['payments'] =[]
+#         for line in report_lines:
+#             print(f'payments value = {line["payments"]}')
         return report_lines, totals
 #line.tax_exigible=False   means  tax.tax_exigibility == 'on_payment'
