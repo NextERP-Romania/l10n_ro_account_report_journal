@@ -98,7 +98,7 @@ class SaleJournalReport(models.TransientModel):
         }
         return docargs
 
-    def compute_report_lines( self, invoices, data, show_warnings, report_type_sale=True ):
+    def compute_report_lines( self, invoices, data, show_warnings=False, report_type_sale=True ):
         """input:
         invoices = account.move list of invoices to be showed in report
         payments = account.move list of payments done on vat_on_payment invoices
@@ -107,10 +107,7 @@ class SaleJournalReport(models.TransientModel):
         
         returns a list of a dictionary for table with the key as column
         and total dictionary with the sums of columns """
-        # self.ensure_one()
-        # find all the keys for dictionary
-        # maybe posible_tags must be put manually,
-        # but if so, to be the same as account.account.tag name
+
         if not invoices:
             return [],{}
         account_partial_reconcile_obj = self.env['account.partial.reconcile']
@@ -176,7 +173,6 @@ class SaleJournalReport(models.TransientModel):
         for inv1 in invoices:
             vals = deepcopy(empty_row)
             vals["number"] = inv1.name
-            vals["tax_exigible"] = True
             vals["date"] = inv1.invoice_date
             vals["partner"] = inv1.commercial_partner_id.name #invoice_partner_display_name
             vals["vat"] = inv1.invoice_partner_display_vat
@@ -211,8 +207,7 @@ class SaleJournalReport(models.TransientModel):
                         )
                 else:
                     unknown_line = True
-                    if not line.tax_exigible:  # vat on payment
-                        vals['tax_exigible'] = False
+                    if not line.tax_exigible:  # VAT on payment
                         put_payments = True
                         for tag in line.tax_tag_ids:  
                         # adding the base and vat from original invoice
@@ -223,8 +218,7 @@ class SaleJournalReport(models.TransientModel):
                                 vals['tva_neex'] += round(sign*(line.credit - line.debit),2)
                                 unknown_line = False
 
-                        # I must see how to do this to search payments ...
-                    else: # NOT vat on payment
+                    else: # NOT VAT on payment
                         if not line.tax_tag_ids:
                             vals['base_0'] += sign*(line.credit - line.debit)
                             unknown_line = False
@@ -264,9 +258,6 @@ class SaleJournalReport(models.TransientModel):
                                             vals[tagx] -=  round(sign*(move_line.credit - move_line.debit),2) # we substract neexigible because is exigible
                                         else:
                                             vals[tagx] +=  round(sign*(move_line.credit - move_line.debit),2)
-#             if vals["rowspan"] > 1:
-#                 vals["rowspan"] -= 1
-
 
             for key, value in sumed_columns.items():
             # put the aggregated values
@@ -295,6 +286,5 @@ class SaleJournalReport(models.TransientModel):
         for key in int_float_keys:
             totals[key] = round(sum([x[key] for x in report_lines]),2)
         totals['payments'] =[]
-#         for line in report_lines:
-#             print(f'payments value = {line["payments"]}')
+
         return report_lines, totals

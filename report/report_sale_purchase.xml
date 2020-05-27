@@ -104,7 +104,7 @@
 <template id="l10n_ro_account_report_journal.sale_tbody_all_lines_without_total">
 						  <t t-call="l10n_ro_account_report_journal.sale_purch_first_5_col"/>
                           <t t-call="l10n_ro_account_report_journal.sale_report_numbers_and_total" />
-                          <td t-if="show_warnings" class="text-left">
+                          <td t-if="show_warnings" class="text-left" t-att-rowspan="l['rowspan']">
                                 <span t-esc="l.get('warnings', '')" />
                           </td>
 </template>
@@ -159,7 +159,25 @@
          </td>
 </template> 
 
-
+<template id="l10n_ro_account_report_journal.payments_lines">
+		                                  <tr t-foreach="l['payments']" t-as="pay">
+		                                      <td  >
+		                                          <span t-esc="pay['number']"/>
+		                                      </td>
+		                                      <td >
+		                                          <span t-esc="pay['date']"/>
+		                                      </td>
+		                                      <td >
+		                                          <span t-esc="pay['amount']"/>
+		                                      </td>
+		                                      <td >
+		                                          <span t-esc="pay['base_exig']"/>
+		                                      </td>
+		                                      <td >
+		                                          <span t-esc="pay['tva_exig']"/>
+		                                      </td>
+		                                  </tr>
+</template>
 
 <!--   the actual report for sale/purchase         the actual report for sale/purchase  -->
     <template id="l10n_ro_account_report_journal.report_sale_purchase">
@@ -251,24 +269,8 @@
 									<t t-call="l10n_ro_account_report_journal.sale_tbody_all_lines_without_total"/> 
 	                      		</tr>
 		                       <t t-if="l['payments']"> <!--  if payments, put lines with them -->
-		                                  <tr t-foreach="l['payments']" t-as="pay">
-		                                      <td  >
-		                                          <span t-esc="pay['number']"/>
-		                                      </td>
-		                                      <td >
-		                                          <span t-esc="pay['date']"/>
-		                                      </td>
-		                                      <td >
-		                                          <span t-esc="pay['amount']"/>
-		                                      </td>
-		                                      <td >
-		                                          <span t-esc="pay['base_exig']"/>
-		                                      </td>
-		                                      <td >
-		                                          <span t-esc="pay['tva_exig']"/>
-		                                      </td>
-		                                  </tr>
-		                           </t>
+		                           <t t-call="l10n_ro_account_report_journal.payments_lines"/>
+		                       </t>
 							</t>
 	                   </t>
 	                   <t t-else="">
@@ -345,10 +347,15 @@
                     </thead>
 		           <tbody>
 	                   <t t-if="lines">
-                          <tr t-foreach="lines" t-as="l" class="text-right">
-							<t t-call="l10n_ro_account_report_journal.purchase_tbody_all_lines_without_total"/>
-                        </tr>
-                        </t>
+                          <t t-foreach="lines" t-as="l" class="text-right">
+	                          <tr>
+								<t t-call="l10n_ro_account_report_journal.purchase_tbody_all_lines_without_total"/>
+		                      </tr>
+		                       <t t-if="l['payments']"> <!--  if payments, put lines with them -->
+		                           <t t-call="l10n_ro_account_report_journal.payments_lines"/>
+		                       </t>
+						  </t>
+                      </t>
 	                   <t t-else="">
 						<tr ><td colspan="32"><h1>No lines in this report. View dates selection</h1></td></tr>	
 	                   </t>
