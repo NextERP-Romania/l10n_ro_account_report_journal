@@ -2,83 +2,60 @@
 <odoo>
 
 <template  id="l10n_ro_account_report_journal.sale_purch_first_5_col">
-                            <td class="text-left">
+                            <td t-att-rowspan="l['rowspan']" class="text-left">
                                 <span t-esc="l_index + 1" />
                             </td>
-                            <td class="text-left">
+                            <td t-att-rowspan="l['rowspan']" class="text-left">
                                 <span t-esc="l['number']" />
                             </td>
-                            <td class="text-left">
+                            <td t-att-rowspan="l['rowspan']" class="text-left">
                                 <span t-esc="l['date']" />
                             </td>
-                            <td colspan="2" class="text-left">
+                            <td t-att-rowspan="l['rowspan']" colspan="2" class="text-left">
                                 <span t-esc="l['partner']" />
                             </td >
-                            <td class="text-left">
+                            <td t-att-rowspan="l['rowspan']" class="text-left">
                                 <span t-esc="l['vat']" />
                             </td>
 </template>
 
 <template	id = "l10n_ro_account_report_journal.sale_purch_6-14_cols">
-                            <td >
+                            <td t-att-rowspan="l['rowspan']">
                                 <span t-esc="l['total']" />
                             </td>
-                            <td >
+                            <td t-att-rowspan="l['rowspan']">
                                 <span t-esc="l['total_base']" />
                             </td>
-                            <td >
+                            <td t-att-rowspan="l['rowspan']">
                                 <span t-esc="l['total_vat']" />
                             </td>
-                            <td >
+                            <td t-att-rowspan="l['rowspan']">
                                 <span t-esc="l['base_19']" />
                             </td>
-                            <td >
+                            <td t-att-rowspan="l['rowspan']">
                                 <span t-esc="l['tva_19']" />
                             </td>
-                            <td >
+                            <td t-att-rowspan="l['rowspan']">
                                 <span t-esc="l['base_9']" />
                             </td>
-                            <td >
+                            <td t-att-rowspan="l['rowspan']">
                                 <span t-esc="l['tva_9']" />
                             </td>
-                            <td >
+                            <td t-att-rowspan="l['rowspan']">
                                 <span t-esc="l['base_5']" />
                             </td>
-                            <td >
+                            <td t-att-rowspan="l['rowspan']">
                                 <span t-esc="l['tva_5']" />
                             </td>
 </template>
 
 <template id="l10n_ro_account_report_journal.vat_on_payment_columns">
-                           <td colspan="5">
-                                        <t t-if="l['payments']">
-
-                                            <table width="100%">
-                                               <tr t-foreach="l['payments']" t-as="pay">
-                                                   <td  >
-                                                       <span t-esc="pay['number']"/>
-                                                   </td>
-                                                   <td >
-                                                       <span t-esc="pay['date']"/>
-                                                   </td>
-                                                   <td >
-                                                       <span t-esc="pay['amount']"/>
-                                                   </td>
-                                                   <td >
-                                                       <span t-esc="pay['base_exig']"/>
-                                                   </td>
-                                                   <td >
-                                                       <span t-esc="pay['tva_exig']"/>
-                                                   </td>
-                                               </tr>
-                                           </table>
-                                        </t>
-                                   
-                             </td>
-                            <td>
+                           <td colspan="5" /> <!-- first a empty line, after will come the payments  -->
+                                    
+                            <td t-att-rowspan="l['rowspan']">
                                 <span t-esc="l['base_neex']" />
                             </td>
-                            <td >
+                            <td t-att-rowspan="l['rowspan']">
                                 <span t-esc="l['tva_neex']" />
                            </td>
 </template>
@@ -88,38 +65,38 @@
 <template	id="l10n_ro_account_report_journal.sale_report_numbers_and_total">
                 <t t-call="l10n_ro_account_report_journal.sale_purch_6-14_cols"/>
 
-                <td >
+                <td t-att-rowspan="l['rowspan']">
                     <span t-esc="l['base_0']" />
                 </td>
-                <td >
+                <td t-att-rowspan="l['rowspan']">
                     <span t-esc="l['invers']" />
                 </td>
-                <td  title="clients advance money">
+                <td  title="clients advance money" t-att-rowspan="l['rowspan']">
                     <!-- <span t-esc="l['avans_clienti']" /> -->
                 </td>
 
 				<t t-call="l10n_ro_account_report_journal.vat_on_payment_columns"/>
 
 
-                <td  title="Intra_communitaire_services_With_deduction_rights">
+                <td  title="Intra_communitaire_services_With_deduction_rights" t-att-rowspan="l['rowspan']">
                     <span t-esc="l['base_ded1']" />
                 </td>
-                <td >
+                <td t-att-rowspan="l['rowspan']">
                     <span t-esc="l['base_ded2']" />
                 </td>
-                <td >
+                <td t-att-rowspan="l['rowspan']">
                     <span t-esc="l['scutit1']" />
                 </td>
-                <td >
+                <td t-att-rowspan="l['rowspan']">
                     <span t-esc="l['scutit2']" />
                 </td>
-                <td  title="Baza TVA Taxare intracomunitara neimpozabila - Vanzari">
+                <td  title="Baza TVA Taxare intracomunitara neimpozabila - Vanzari" t-att-rowspan="l['rowspan']">
                     <span t-esc="l['others']" />
                 </td>
-                <td  title="Baza TVA Taxare Inversa asta e la fel ca la national">
+                <td  title="Baza TVA Taxare Inversa asta e la fel ca la national" t-att-rowspan="l['rowspan']">
                     <span t-esc="l['base_col']" />
                 </td>
-                <td  title="TVA Taxare Inversa (TVA colectata)">
+                <td  title="TVA Taxare Inversa (TVA colectata)" t-att-rowspan="l['rowspan']">
                     <span t-esc="l['tva_col']" />
                 </td>
 </template>
@@ -271,6 +248,28 @@
 	                   <t t-if="lines">
 	                       <tr t-foreach="lines" t-as="l" class="text-right">
 							<t t-call="l10n_ro_account_report_journal.sale_tbody_all_lines_without_total"/> 
+	                      
+	                       <t t-if="l['payments']"> <!--  if payments, put lines with them -->
+								  
+                                   <tr t-foreach="l['payments']" t-as="pay">
+                                       <td  >
+                                           <span t-esc="pay['number']"/>
+                                       </td>
+                                       <td >
+                                           <span t-esc="pay['date']"/>
+                                       </td>
+                                       <td >
+                                           <span t-esc="pay['amount']"/>
+                                       </td>
+                                       <td >
+                                           <span t-esc="pay['base_exig']"/>
+                                       </td>
+                                       <td >
+                                           <span t-esc="pay['tva_exig']"/>
+                                       </td>
+                                   </tr>
+                            </t>
+	                   
 	                        </tr>
 	                   </t>
 	                   <t t-else="">

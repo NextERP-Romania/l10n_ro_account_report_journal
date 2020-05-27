@@ -182,6 +182,7 @@ class SaleJournalReport(models.TransientModel):
             vals["vat"] = inv1.invoice_partner_display_vat
             vals["total"] = sign*(inv1.amount_total_signed)
             vals["warnings"] = ""
+            vals["rowspan"] = 1
 # search the reconcile line
             reconcile_account_move_line_id = False
             for line in inv1.line_ids:
@@ -249,6 +250,7 @@ class SaleJournalReport(models.TransientModel):
                                     vals['tva_neex'] -= round(sign*(move_line.credit - move_line.debit),2)
                     else:  
                     # is payment in period and we are going also to show it, and also substract it
+                        vals["rowspan"] += 1
                         vals['payments'] += [{'number':move.ref ,'date': move.date,'amount':move.amount_total,'base_exig':0,'tva_exig':0}]
                         for move_line in move.line_ids:
                             if 'TVA' in ''.join([x.name for x in move_line.tax_tag_ids]):
@@ -262,6 +264,8 @@ class SaleJournalReport(models.TransientModel):
                                             vals[tagx] -=  round(sign*(move_line.credit - move_line.debit),2) # we substract neexigible because is exigible
                                         else:
                                             vals[tagx] +=  round(sign*(move_line.credit - move_line.debit),2)
+#             if vals["rowspan"] > 1:
+#                 vals["rowspan"] -= 1
 
 
             for key, value in sumed_columns.items():
