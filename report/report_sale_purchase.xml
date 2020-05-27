@@ -113,40 +113,40 @@
 <!--   templates only for purchases   templates only for purchases -->
 <template id="l10n_ro_account_report_journal.purchase_report_numbers_and_total">
 		<t t-call="l10n_ro_account_report_journal.sale_purch_6-14_cols"/>
-        <td>
+        <td t-att-rowspan="l['rowspan']">
               <t t-set="base_extracomunitar"  t-value="'EXTRACOMUNITAR_NU_EXISTA'" />
              <span t-esc="base_extracomunitar"/>                             
         </td>
-        <td>
+        <td t-att-rowspan="l['rowspan']">
               <t t-set="tva_extracomunitar"  t-value="'TVA_EXTRACOMUNITAR_NU_EXISTA'" />
              <span t-esc="tva_extracomunitar"/>                                     
         </td>
 		<t t-call="l10n_ro_account_report_journal.vat_on_payment_columns"/>
-         <td  tile="vat0">
+         <td  tile="vat0" t-att-rowspan="l['rowspan']">
             <span t-esc="base_0"/>                                    </td>
-         <td  title="Baza TVA Intracomunitar Servicii (deductibila)">
+         <td  title="Baza TVA Intracomunitar Servicii (deductibila)" t-att-rowspan="l['rowspan']">
               <span t-esc="base_ded1"/> 
-          </td>
-         <td  title="Intra_communitaire_services_With_deduction_rights or no vat" >
+          </td >
+         <td  title="Intra_communitaire_services_With_deduction_rights or no vat" t-att-rowspan="l['rowspan']">
               <span t-esc="tva_ded1"/> 
         </td>
-        <td  title="Baza TVA Intracomunitar Bunuri (deductibila)">
+        <td  title="Baza TVA Intracomunitar Bunuri (deductibila)" t-att-rowspan="l['rowspan']">
               <span t-esc="base_ded2"/> 
          </td>
-        <td title="-TVA Intracomunitar Bunuri (deductibila)">
+        <td title="-TVA Intracomunitar Bunuri (deductibila)" t-att-rowspan="l['rowspan']">
               <span t-esc="tva_ded2"/> 
          </td>
 
-         <td  title="Baza TVA Taxare Scutita - Achizitii">
+         <td  title="Baza TVA Taxare Scutita - Achizitii" t-att-rowspan="l['rowspan']">
               <span t-esc="scutit1"/> 
          </td>
-         <td  title="Baza TVA Taxare intracomunitara neimpozabila - Achizitii">
+         <td  title="Baza TVA Taxare intracomunitara neimpozabila - Achizitii" t-att-rowspan="l['rowspan']">
               <span t-esc="scutit2"/> 
          </td>
-         <td  title="-Baza TVA Taxare Inversa (deductibila)">
+         <td  title="-Baza TVA Taxare Inversa (deductibila)" t-att-rowspan="l['rowspan']">
               <span t-esc="base_inverse_taxation"/> 
          </td>
-         <td  title="TVA Taxare Inversa (deductibila)">
+         <td  title="TVA Taxare Inversa (deductibila)" t-att-rowspan="l['rowspan']">
               <span t-esc="tva_inverse_taxation"/> 
          </td>
 </template>
@@ -154,8 +154,8 @@
 <template id="l10n_ro_account_report_journal.purchase_tbody_all_lines_without_total">
 		<t t-call="l10n_ro_account_report_journal.sale_purch_first_5_col"/>
 		<t t-call="l10n_ro_account_report_journal.purchase_report_numbers_and_total"/>
-         <td t-if="show_warnings" class="text-left">
-               <span t-esc="l.get('warnings', '')" />
+         <td t-if="show_warnings" class="text-left" t-att-rowspan="l['rowspan']">
+               <span t-esc="l.get('warnings', '')"  />
          </td>
 </template> 
 
@@ -246,31 +246,30 @@
                     </thead>
                     <tbody>
 	                   <t t-if="lines">
-	                       <tr t-foreach="lines" t-as="l" class="text-right">
-							<t t-call="l10n_ro_account_report_journal.sale_tbody_all_lines_without_total"/> 
-	                      
-	                       <t t-if="l['payments']"> <!--  if payments, put lines with them -->
-								  
-                                   <tr t-foreach="l['payments']" t-as="pay">
-                                       <td  >
-                                           <span t-esc="pay['number']"/>
-                                       </td>
-                                       <td >
-                                           <span t-esc="pay['date']"/>
-                                       </td>
-                                       <td >
-                                           <span t-esc="pay['amount']"/>
-                                       </td>
-                                       <td >
-                                           <span t-esc="pay['base_exig']"/>
-                                       </td>
-                                       <td >
-                                           <span t-esc="pay['tva_exig']"/>
-                                       </td>
-                                   </tr>
-                            </t>
-	                   
-	                        </tr>
+	                       <t t-foreach="lines" t-as="l" class="text-right">
+								<tr>
+									<t t-call="l10n_ro_account_report_journal.sale_tbody_all_lines_without_total"/> 
+	                      		</tr>
+		                       <t t-if="l['payments']"> <!--  if payments, put lines with them -->
+		                                  <tr t-foreach="l['payments']" t-as="pay">
+		                                      <td  >
+		                                          <span t-esc="pay['number']"/>
+		                                      </td>
+		                                      <td >
+		                                          <span t-esc="pay['date']"/>
+		                                      </td>
+		                                      <td >
+		                                          <span t-esc="pay['amount']"/>
+		                                      </td>
+		                                      <td >
+		                                          <span t-esc="pay['base_exig']"/>
+		                                      </td>
+		                                      <td >
+		                                          <span t-esc="pay['tva_exig']"/>
+		                                      </td>
+		                                  </tr>
+		                           </t>
+							</t>
 	                   </t>
 	                   <t t-else="">
 						<tr ><td colspan="32"><h1>No lines in this report. View dates selection</h1></td></tr>	
