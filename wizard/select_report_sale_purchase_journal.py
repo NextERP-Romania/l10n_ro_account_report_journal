@@ -87,14 +87,7 @@ class SalePurchaseJournalReport(models.TransientModel):
         self.ensure_one()
         [data] = self.read()
         datas = {"ids": [], "model": "l10n_ro_account_report_journal", "form": data}
-        if self.journal_type == "sale":
-            report_action = "l10n_ro_account_report_journal.action_report_sale" + (
-                "_html" if html else ""
-            )
-        else:
-            report_action = "l10n_ro_account_report_journal.action_report_sale" + (
-                "_html" if html else ""
-            )
+        report_action = "l10n_ro_account_report_journal.action_report_sale" + ("_html" if html else ""  )
         ref = self.env.ref(report_action)
         res = ref.report_action(docids=[], data=datas, config=False)
         return res
