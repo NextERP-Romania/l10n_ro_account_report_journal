@@ -256,10 +256,12 @@ class SaleJournalReport(models.TransientModel):
                             elif 'BAZA' in ''.join([x.name for x in move_line.tax_tag_ids]):
                                 vals['payments'][-1]['base_exig'] += round(sign*(move_line.credit - move_line.debit),2)
                             for tag in move_line.tax_tag_ids:
-                                if tag.name in all_known_tags.keys():
+                                if tag.name in all_known_tags.keys()  :
                                     for tagx in all_known_tags[tag.name]:
-                                        vals[tagx] +=  round(sign*(move_line.credit - move_line.debit),2)
-                         #vals['base_neex'] -= 
+                                        if tagx in ['base_neex', 'tva_neex']:
+                                            vals[tagx] -=  round(sign*(move_line.credit - move_line.debit),2) # we substract neexigible because is exigible
+                                        else:
+                                            vals[tagx] +=  round(sign*(move_line.credit - move_line.debit),2)
 
 
             for key, value in sumed_columns.items():
