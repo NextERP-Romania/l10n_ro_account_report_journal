@@ -215,7 +215,8 @@ class SaleJournalReport(models.TransientModel):
                             for tag in line.tax_tag_ids:
                                 if tag.name in all_known_tags.keys():
                                     for tagx in all_known_tags[tag.name]:
-                                        vals[tagx] +=  sign*(line.credit - line.debit)
+                                        if tagx not in ['tva_neex','base_neex',]:
+                                            vals[tagx] +=  sign*(line.credit - line.debit)
                                     unknown_line = False
                         if  unknown_line:
                             vals['warnings'] += f"unknown report column for line {line.name} debit={line.debit} credit={line.credit} TAGS{[x.name for x in line.tax_tag_ids]};" 
