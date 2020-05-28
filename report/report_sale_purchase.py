@@ -33,7 +33,7 @@ class SaleJournalReport(models.TransientModel):
         invoices_with_tax_cash_basis_ids = []  # id's to take also the invoices that are not in selected period
 
 # invoices that are older than the start date and not paid if they have vat on payment must appear into this report
-        older_unpaid_invoices =  account_move_obj.search ([
+        older_unpaid_invoices =  account_move_obj.search (sale_purchase_domain+[
             ("state", "=", "posted"),
             ("company_id", "=", company_id.id),
             ("invoice_date", "<", date_from),
@@ -162,8 +162,8 @@ class SaleJournalReport(models.TransientModel):
                 else:
                     all_known_tags[tag] = [k]
 
-        empty_row = {k:0 for k in sumed_columns}
-        empty_row.update( {k:0 for k,v in sale_and_purchase_comun_columns.items() if v['type']=='int' }) 
+        empty_row = {k:0.0 for k in sumed_columns}
+        empty_row.update( {k:0.0 for k,v in sale_and_purchase_comun_columns.items() if v['type']=='int' }) 
         empty_row.update( {k:'' for k,v in sale_and_purchase_comun_columns.items() if v['type']=='char' }) 
         empty_row.update( {k:[] for k,v in sale_and_purchase_comun_columns.items() if v['type']=='list' }) 
         
@@ -201,10 +201,10 @@ class SaleJournalReport(models.TransientModel):
                         for tag in line.tax_tag_ids:  
                         # adding the base and vat from original invoice
                             if tag.name in sale_and_purchase_comun_columns['base_neex']['tags']:
-                                vals['base_neex'] += round(sign*(line.credit - line.debit),2)
+                                vals['base_neex'] += sign*(line.credit - line.debit)
                                 unknown_line = False
                             elif tag.name in sale_and_purchase_comun_columns['tva_neex']['tags']:
-                                vals['tva_neex'] += round(sign*(line.credit - line.debit),2)
+                                vals['tva_neex'] += sign*(line.credit - line.debit)
                                 unknown_line = False
 
                     else: # NOT VAT on payment
@@ -241,30 +241,32 @@ class SaleJournalReport(models.TransientModel):
                         for move_line in move.line_ids:
                             for tag in move_line.tax_tag_ids:
                                 if tag.name in sale_and_purchase_comun_columns['base_neex']['tags']:
-                                    vals['base_neex'] -= round(sign*(move_line.credit - move_line.debit),2)
+                                    vals['base_neex'] -= sign*(move_line.credit - move_line.debit)
                                 elif tag.name in sale_and_purchase_comun_columns['tva_neex']['tags']:
-                                    vals['tva_neex'] -= round(sign*(move_line.credit - move_line.debit),2)
+                                    vals['tva_neex'] -= sign*(move_line.credit - move_line.debit)
                     else:  
                     # is payment in period and we are going also to show it, and also substract it
                         vals["rowspan"] += 1
                         vals['payments'] += [{'number':move.ref ,'date': move.date,'amount':move.amount_total,'base_exig':0,'tva_exig':0}]
                         for move_line in move.line_ids:
                             if 'TVA' in ''.join([x.name for x in move_line.tax_tag_ids]):
-                                vals['payments'][-1]['tva_exig'] += round(sign*(move_line.credit - move_line.debit),2)
+                                vals['payments'][-1]['tva_exig'] += sign*(move_line.credit - move_line.debit)
                             elif 'BAZA' in ''.join([x.name for x in move_line.tax_tag_ids]):
-                                vals['payments'][-1]['base_exig'] += round(sign*(move_line.credit - move_line.debit),2)
+                                vals['payments'][-1]['base_exig'] +=sign*(move_line.credit - move_line.debit)
                             for tag in move_line.tax_tag_ids:
                                 if tag.name in all_known_tags.keys()  :
                                     for tagx in all_known_tags[tag.name]:
                                         if tagx in ['base_neex', 'tva_neex']:
-                                            vals[tagx] -=  round(sign*(move_line.credit - move_line.debit),2) # we substract neexigible because is exigible
+                                            vals[tagx] -=  sign*(move_line.credit - move_line.debit) # we substract neexigible because is exigible
                                         else:
-                                            vals[tagx] +=  round(sign*(move_line.credit - move_line.debit),2)
+                                            vals[tagx] +=  sign*(move_line.credit - move_line.debit)
             if vals["rowspan"]>1:
                 vals["rowspan"] -= 1
-
+            
+            vals['base_neex'],vals['tva_neex']=round(vals['base_neex'],2),round(vals['tva_neex'],2)
+            
             for key, value in sumed_columns.items():
-            # put the aggregated values
+            # put the aggregated values ( summed columns)
                 vals[key] = sum([vals[x] for x in value])
 
             report_lines += [vals]  # we added another line to the table
