@@ -50,7 +50,27 @@
 </template>
 
 <template id="l10n_ro_account_report_journal.vat_on_payment_columns">
-                           <td colspan="5" /> <!-- first a empty line, after will come the payments  -->
+                           <t t-if="not l['payments']">
+	                           <td colspan="5" /> <!-- first a empty line, after will come the payments  -->
+                           </t>
+                           <t t-if="l['payments']">
+   		                                      <td  >
+		                                          <span t-esc="l['payments'][0]['number']"/>
+		                                      </td>
+		                                      <td >
+		                                          <span t-esc="l['payments'][0]['date']"/>
+		                                      </td>
+		                                      <td >
+		                                          <span t-esc="l['payments'][0]['amount']"/>
+		                                      </td>
+		                                      <td >
+		                                          <span t-esc="l['payments'][0]['base_exig']"/>
+		                                      </td>
+		                                      <td >
+		                                          <span t-esc="l['payments'][0]['tva_exig']"/>
+		                                      </td>
+                           
+                           </t>
                                     
                             <td t-att-rowspan="l['rowspan']">
                                 <span t-esc="l['base_neex']" />
@@ -160,7 +180,7 @@
 </template> 
 
 <template id="l10n_ro_account_report_journal.payments_lines">
-		                                  <tr t-foreach="l['payments']" t-as="pay">
+		                                  <tr t-foreach="l['payments'][1:]" t-as="pay">
 		                                      <td  >
 		                                          <span t-esc="pay['number']"/>
 		                                      </td>

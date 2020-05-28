@@ -260,6 +260,8 @@ class SaleJournalReport(models.TransientModel):
                                             vals[tagx] -=  round(sign*(move_line.credit - move_line.debit),2) # we substract neexigible because is exigible
                                         else:
                                             vals[tagx] +=  round(sign*(move_line.credit - move_line.debit),2)
+            if vals["rowspan"]>1:
+                vals["rowspan"] -= 1
 
             for key, value in sumed_columns.items():
             # put the aggregated values
