@@ -179,18 +179,7 @@ class SaleJournalReport(models.TransientModel):
             vals["total"] = sign*(inv1.amount_total_signed)
             vals["warnings"] = ""
             vals["rowspan"] = 1
-# search the reconcile line
-            reconcile_account_move_line_id = False
-            for line in inv1.line_ids:
-                if line.account_id.code.startswith("411") or line.account_id.code.startswith("401"):
-                    reconcile_account_move_line_id = line.id
-                    break
-# find all the reconciliation till date to
-            all_reconcile = account_partial_reconcile_obj.search([
-                '|',('debit_move_id','=',reconcile_account_move_line_id) ,('credit_move_id','=',reconcile_account_move_line_id),
-                ('company_id','=',data["form"]["company_id"][0]),
-                ('max_date','<=',data["form"]["date_to"]),  ])
-            all_reconcile_ids = [x.id for x in all_reconcile]
+
             put_payments = False # after parsing the invoice lines, if is vat on payment, to put also the payments
 # take all the lines from this invoice and put them into dictionary            
             for line in inv1.line_ids:
@@ -232,7 +221,20 @@ class SaleJournalReport(models.TransientModel):
                             vals['warnings'] += f"unknown report column for line {line.name} debit={line.debit} credit={line.credit} TAGS{[x.name for x in line.tax_tag_ids]};" 
 
             if put_payments:
-            # This invoice is vat on payment and we are going to put the payments 
+            # This invoice is vat on payment and we are going to put the payments
+# search the reconcile line
+                reconcile_account_move_line_id = False
+                for line in inv1.line_ids:
+                    if line.account_id.code.startswith("411") or line.account_id.code.startswith("401"):
+                        reconcile_account_move_line_id = line.id
+                        break
+# find all the reconciliation till date to
+                all_reconcile = account_partial_reconcile_obj.search([
+                    '|',('debit_move_id','=',reconcile_account_move_line_id) ,('credit_move_id','=',reconcile_account_move_line_id),
+                    ('company_id','=',data["form"]["company_id"][0]),
+                    ('max_date','<=',data["form"]["date_to"]),  ])
+                all_reconcile_ids = [x.id for x in all_reconcile]
+             
                 for move in self.env['account.move'].search([('tax_cash_basis_rec_id', 'in', all_reconcile_ids)]):
                     if move.date < datetime.strptime(data["form"]["date_from"], DEFAULT_SERVER_DATE_FORMAT).date() :  
                     # this payment is in a period before and we will just substract it
